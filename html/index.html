@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Player Shop & Courier</title>
+  <style>
+    :root{--bg:rgba(0,0,0,.45);--panel:#161616;--panel2:#1e1e1e;--text:#eee;--muted:#aaa;--border:#2a2a2a;--accent:#ff7a1a;--accent2:#ff9b4d;}
+    html,body{margin:0;background:transparent;color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
+    .hidden{display:none!important}
+    #app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+    .card{width:min(1300px,100vw);max-height:86vh;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);padding:14px;display:flex;flex-direction:column}
+    .row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+    .title{font-weight:700}
+    .btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+    .btn:hover{transform:translateY(-1px)}
+    .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#111}
+    .btn.small{padding:6px 10px}
+    .btn.tab{opacity:.85}
+    .btn.tab.active{outline:2px solid var(--accent);opacity:1}
+    .input{background:#121212;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;outline:none;width:100%}
+    .toolbar{display:flex;gap:12px;align-items:center;margin:10px 0;flex-wrap:wrap}
+    .toolbar .left{display:flex;gap:8px;align-items:center}
+    .pager{display:flex;gap:8px;margin-left:auto;align-items:center}
+    .muted{color:var(--muted)}
+    .pill{font-size:12px;border:1px solid var(--border);border-radius:999px;padding:4px 10px;color:var(--muted)}
+    /* grid list */
+    .grid{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+    .item{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:10px;display:flex;gap:10px;cursor:pointer;min-height:74px}
+    .thumb{width:52px;height:52px;border-radius:8px;background:#0c0c0c;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 52px}
+    .thumb img{width:100%;height:100%;object-fit:contain}
+    .meta{display:flex;flex-direction:column;gap:4px;overflow:hidden;min-width:0}
+    .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sub{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .footer{margin-top:8px;border-top:1px solid var(--border);padding-top:8px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+    /* modal */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center}
+    .modal .box{width:min(420px,92vw);background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+    .col{display:flex;flex-direction:column;gap:8px}
+    /* courier list */
+    .orders{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+    .order{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+    .order .row2{display:flex;align-items:center;gap:10px;justify-content:space-between}
+  </style>
+</head>
+<body>
+  <div id="app" class="hidden">
+    <div class="card">
+      <div class="row">
+        <div class="title">🛒 Player Shop / 📦 Courier</div>
+        <button id="closeBtn" class="btn">✕</button>
+      </div>
+
+      <div class="toolbar">
+        <div class="left">
+          <button id="tabShop" class="btn tab">Shop</button>
+          <button id="tabCourier" class="btn tab">Courier</button>
+          <span id="courierPill" class="pill">Couriers Online: 0</span>
+        </div>
+
+        <!-- SHOP controls -->
+        <input id="search" class="input shop-only" placeholder="Search items...">
+        <div class="pager shop-only">
+          <button id="prevBtn" class="btn small">Prev</button>
+          <span id="pageText" class="muted">Page 1/1</span>
+          <button id="nextBtn" class="btn small">Next</button>
+        </div>
+
+        <!-- COURIER controls -->
+        <div class="pager courier-only hidden">
+          <button id="refreshOrders" class="btn small">Refresh</button>
+        </div>
+      </div>
+
+      <!-- SHOP GRID -->
+      <div id="grid" class="grid"></div>
+
+      <!-- COURIER LIST -->
+      <div id="orders" class="orders hidden"></div>
+
+      <div class="footer">
+        <span id="footNote" class="muted">Click an item to set quantity and order.</span>
+        <span class="muted" id="courierPillFooter">Couriers Online: 0</span>
+      </div>
+    </div>
+
+    <!-- quantity modal -->
+    <div id="modal" class="modal hidden">
+      <div class="box">
+        <div class="row">
+          <div id="modalTitle" class="title">Item</div>
+          <button id="modalClose" class="btn">✕</button>
+        </div>
+        <div class="col">
+          <label>Quantity</label>
+          <input id="qtyInput" type="number" class="input" min="1" value="1">
+          <div id="modalPrice" class="muted">£0 total</div>
+          <button id="orderBtn" class="btn primary">Order</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== helpers
+    const $ = (s) => document.querySelector(s);
+    const app = $('#app'), grid = $('#grid'), search = $('#search'),
+          prevBtn = $('#prevBtn'), nextBtn = $('#nextBtn'), pageText = $('#pageText'),
+          closeBtn = $('#closeBtn'), modal = $('#modal'), modalClose = $('#modalClose'),
+          modalTitle = $('#modalTitle'), qtyInput = $('#qtyInput'), modalPrice = $('#modalPrice'),
+          orderBtn = $('#orderBtn'), footNote = $('#footNote');
+
+    const tabShop = $('#tabShop'), tabCourier = $('#tabCourier');
+    const ordersWrap = $('#orders'), refreshOrdersBtn = $('#refreshOrders');
+    const courierPill = $('#courierPill');
+    const courierPillFooter = $('#courierPillFooter');
+
+    let OPEN = false, MODE = 'shop';
+    let ITEMS = [], PAGE = 1, PER_PAGE = 12, MAX_QTY = 50, currentItem = null;
+    let ORDERS = [];
+    let COURIERS = 0;
+
+    function setCourierCount(n){
+      COURIERS = Number(n) || 0;
+      courierPill.textContent = `Couriers Online: ${COURIERS}`;
+      courierPillFooter.textContent = `Couriers Online: ${COURIERS}`;
+    }
+
+    function nui(name, data){
+      return fetch(`https://${GetParentResourceName()}/${name}`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(data || {})
+      }).then(r => r.json().catch(() => ({})));
+    }
+    const currency = (n) => `£${Number(n).toLocaleString()}`;
+    const iconFor = (it) => `nui://qb-inventory/html/images/${it.image}`;
+
+    function setMode(m){
+      MODE = m;
+      // tabs
+      tabShop.classList.toggle('active', m === 'shop');
+      tabCourier.classList.toggle('active', m === 'courier');
+      // containers
+      grid.classList.toggle('hidden', m !== 'shop');
+      ordersWrap.classList.toggle('hidden', m !== 'courier');
+      // controls
+      document.querySelectorAll('.shop-only').forEach(el => el.classList.toggle('hidden', m !== 'shop'));
+      document.querySelectorAll('.courier-only').forEach(el => el.classList.toggle('hidden', m !== 'courier'));
+      // footer note
+      if (m === 'shop') footNote.textContent = 'Click an item to set quantity and order.';
+      else footNote.textContent = 'Click Accept to take an order.';
+    }
+
+    // ===== SHOP RENDER
+    function renderShop(){
+      const totalPages = Math.max(1, Math.ceil(ITEMS.length / PER_PAGE));
+      if (PAGE > totalPages) PAGE = totalPages; if (PAGE < 1) PAGE = 1;
+      const start = (PAGE - 1) * PER_PAGE;
+      const slice = ITEMS.slice(start, start + PER_PAGE);
+
+      grid.innerHTML = '';
+      slice.forEach(it => {
+        const el = document.createElement('div');
+        el.className = 'item';
+        el.innerHTML = `
+          <div class="thumb"><img loading="lazy" alt=""></div>
+          <div class="meta">
+            <div class="name"></div>
+            <div class="sub"></div>
+          </div>
+        `;
+        const img = el.querySelector('img');
+        const nameEl = el.querySelector('.name');
+        const subEl  = el.querySelector('.sub');
+
+        img.src = iconFor(it);
+        img.onerror = () => { img.style.display = 'none'; };
+
+        nameEl.textContent = it.label;
+        subEl.textContent  = `${it.name} • ${currency(it.price)}`;
+
+        el.addEventListener('click', () => openModal(it));
+        grid.appendChild(el);
+      });
+
+      pageText.textContent = `Page ${PAGE}/${totalPages}`;
+      prevBtn.disabled = PAGE <= 1;
+      nextBtn.disabled = PAGE >= totalPages;
+    }
+
+    function openModal(it){
+      currentItem = it;
+      qtyInput.value = 1;
+      modalTitle.textContent = `${it.label} (${currency(it.price)} each)`;
+      modalPrice.textContent = currency(it.price) + ' total';
+      modal.classList.remove('hidden');
+    }
+    function closeModal(){ currentItem = null; modal.classList.add('hidden'); }
+
+    function refreshShop(filter){
+      return nui('shop:getCatalog', { filter }).then(res => {
+        if (res && res.ok) { ITEMS = res.items || []; PAGE = 1; renderShop(); }
+      });
+    }
+
+    // ===== COURIER RENDER
+    function renderCourier(){
+      ordersWrap.innerHTML = '';
+      if (!ORDERS.length){
+        const none = document.createElement('div');
+        none.className = 'order';
+        none.innerHTML = `<div class="name">No open orders.</div><div class="muted">Go to courier on your map to start accepting jobs.</div>`;
+        ordersWrap.appendChild(none);
+        return;
+      }
+      ORDERS.forEach(o => {
+        const el = document.createElement('div');
+        el.className = 'order';
+        const label = o.label || o.item;
+        el.innerHTML = `
+          <div class="row2">
+            <div class="name">#${o.id} • ${label}</div>
+            <span class="pill">${o.amount}x</span>
+          </div>
+          <div class="muted">${o.item}</div>
+          <div class="row2">
+            <div class="muted">${currency(o.total)}</div>
+            <button class="btn primary small">Accept</button>
+          </div>
+        `;
+        el.querySelector('button').addEventListener('click', () => {
+          nui('courier:acceptOrder', { id: o.id }).then(() => {
+            ORDERS = ORDERS.filter(x => x.id !== o.id);
+            renderCourier();
+          });
+        });
+        ordersWrap.appendChild(el);
+      });
+    }
+
+    function refreshCourier(){
+      return nui('courier:getOrders', {}).then(res => {
+        if (res && res.ok) {
+          ORDERS = res.orders || [];
+          renderCourier();
+        }
+      });
+    }
+
+    // ===== open/close + live updates
+    window.addEventListener('message', (e) => {
+      const data = e.data || {};
+      if (data.action === 'open') {
+        OPEN = true;
+        MAX_QTY = data.maxQty || 50;
+        PER_PAGE = data.perPage || 12;
+        app.classList.remove('hidden');
+        setMode('shop');
+        search.value = '';
+        refreshShop('');
+        // initial courier count
+        nui('courier:getCount', {}).then(res => { if (res && res.ok) setCourierCount(res.count); });
+        setTimeout(() => search.focus(), 50);
+      }
+      if (data.action === 'openCourierMenu' || data.action === 'openCourier') {
+        OPEN = true;
+        app.classList.remove('hidden');
+        setMode('courier');
+        refreshCourier();
+        nui('courier:getCount', {}).then(res => { if (res && res.ok) setCourierCount(res.count); });
+      }
+      if (data.action === 'courierCount') {
+        setCourierCount(data.count || 0);
+      }
+      if (data.action === 'close') {
+        OPEN = false;
+        closeModal();
+        app.classList.add('hidden');
+      }
+    });
+
+    closeBtn.addEventListener('click', () => {
+      closeModal();
+      app.classList.add('hidden');
+      nui('shop:close', {});
+    });
+
+    // shop controls
+    qtyInput.addEventListener('input', () => {
+      let q = Math.max(1, Math.min(MAX_QTY, parseInt(qtyInput.value || '1', 10)));
+      qtyInput.value = q;
+      if (currentItem) modalPrice.textContent = currency(currentItem.price * q) + ' total';
+    });
+    orderBtn.addEventListener('click', () => {
+      if (!currentItem) return;
+      let q = Math.max(1, Math.min(MAX_QTY, parseInt(qtyInput.value || '1', 10)));
+      nui('shop:placeOrder', { name: currentItem.name, amount: q }).then(() => { closeModal(); });
+    });
+
+    search.addEventListener('input', (e) => refreshShop(e.target.value || ''));
+    prevBtn.addEventListener('click', () => { PAGE--; renderShop(); });
+    nextBtn.addEventListener('click', () => { PAGE++; renderShop(); });
+
+    modal.addEventListener('click', (ev) => { if (ev.target === modal) closeModal(); });
+    modalClose.addEventListener('click', () => { closeModal(); });
+
+    document.addEventListener('keydown', (e) => {
+      if (!OPEN) return;
+      if (e.key === 'Escape') {
+        if (!modal.classList.contains('hidden')) closeModal();
+        else { app.classList.add('hidden'); nui('shop:close', {}); }
+      }
+    });
+
+    // tabs
+    tabShop.addEventListener('click', () => {
+      setMode('shop');
+      search.value = '';
+      refreshShop('');
+      nui('courier:getCount', {}).then(res => { if (res && res.ok) setCourierCount(res.count); });
+      setTimeout(() => search.focus(), 50);
+    });
+    tabCourier.addEventListener('click', () => {
+      setMode('courier');
+      refreshCourier();
+      nui('courier:getCount', {}).then(res => { if (res && res.ok) setCourierCount(res.count); });
+    });
+
+    refreshOrdersBtn.addEventListener('click', () => refreshCourier());
+  </script>
+</body>
+</html>
